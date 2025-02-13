@@ -137,7 +137,7 @@ func (p *adProvider) SearchPrincipals(searchKey, principalType string, myToken a
 	if err == nil {
 		for _, principal := range principals {
 			if principal.PrincipalType == "user" {
-				if p.isThisUserMe(myToken.GetUserPrincipal(), principal) {
+				if p.isThisUserMe(myToken, principal) {
 					principal.Me = true
 				}
 			} else if principal.PrincipalType == "group" {
@@ -164,17 +164,16 @@ func (p *adProvider) GetPrincipal(principalID string, token accessor.TokenAccess
 	if err != nil {
 		return v3.Principal{}, err
 	}
-	if p.isThisUserMe(token.GetUserPrincipal(), *principal) {
+	if p.isThisUserMe(token, *principal) {
 		principal.Me = true
 	}
 	return *principal, err
 }
 
-func (p *adProvider) isThisUserMe(me v3.Principal, other v3.Principal) bool {
-	if me.ObjectMeta.Name == other.ObjectMeta.Name && me.LoginName == other.LoginName && me.PrincipalType == other.PrincipalType {
-		return true
-	}
-	return false
+func (p *adProvider) isThisUserMe(me accessor.TokenAccessor, other v3.Principal) bool {
+	return me.GetUserPrincipalID() == other.ObjectMeta.Name &&
+		me.GetUserName() == other.LoginName &&
+		me.GetUserPrincipalType() == other.PrincipalType
 }
 
 func (p *adProvider) getActiveDirectoryConfig() (*v32.ActiveDirectoryConfig, *x509.CertPool, error) {
@@ -256,6 +255,19 @@ func (p *adProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[stri
 	}
 	if userPrincipal.LoginName != "" {
 		extras[common.UserAttributeUserName] = []string{userPrincipal.LoginName}
+	}
+	return extras
+}
+
+func (p *adProvider) GetUserExtraAttributesFromToken(token accessor.TokenAccessor) map[string][]string {
+	principalID := token.GetUserPrincipalID()
+	userName := token.GetUserName()
+	extras := make(map[string][]string)
+	if principalID != "" {
+		extras[common.UserAttributePrincipalID] = []string{principalID}
+	}
+	if userName != "" {
+		extras[common.UserAttributeUserName] = []string{userName}
 	}
 	return extras
 }
