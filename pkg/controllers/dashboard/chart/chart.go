@@ -56,7 +56,7 @@ type Definition struct {
 	ExactVersionSetting settings.Setting
 	Values              func() map[string]interface{}
 	Enabled             func() bool
-	Uninstall           bool
+	Uninstall           bool // if true, the chart will be uninstalled regardless of the value of Enabled
 	RemoveNamespace     bool
 }
 
