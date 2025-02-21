@@ -156,6 +156,19 @@ var (
 		false,
 		false,
 		true).lockOnInstall()
+	ClusterAgentSchedulingCustomization = newFeature(
+		"cluster-agent-scheduling-customization",
+		"Enables the automatic deployment of Pod Disruption Budgets and Priority Classes when deploying the cattle-cluster-agent. Disabling this feature will not impact existing clusters.",
+		false,
+		true,
+		true)
+
+	ImperativeApiExtension = newFeature(
+		"imperative-api-extension",
+		"Enable imperative API extension as a k8s aggregation layer as proxy to the kube apiserver",
+		false,
+		false,
+		true)
 )
 
 type Feature struct {

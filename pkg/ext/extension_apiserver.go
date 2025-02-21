@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 
 	extstores "github.com/rancher/rancher/pkg/ext/stores"
@@ -149,23 +148,30 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 	}
 
 	var additionalSniProviders []dynamiccertificates.SNICertKeyContentProvider
-	switch os.Getenv("CATTLE_IMPERATIVE_API_EXTENSION") {
-	case "true":
+	if features.ImperativeApiExtension.Enabled() {
 		logrus.Info("creating imperative extension apiserver resources")
 
-		sniProvider, err := certForCommonName(fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace))
+		sniProvider, err := NewSNIProviderForCname(
+			"imperative-api-sni-provider",
+			[]string{fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace)},
+			wranglerContext.Core.Secret(),
+		)
+
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate cert for target service: %w", err)
 		}
 
+		sniProvider.AddListener(ApiServiceCertListener(sniProvider, wranglerContext.API.APIService()))
+
+		go func() {
+			if err := sniProvider.Run(ctx.Done()); err != nil {
+				logrus.Errorf("sni provider failed: %s", err)
+			}
+		}()
+
 		additionalSniProviders = append(additionalSniProviders, sniProvider)
 
 		if err := CreateOrUpdateService(wranglerContext.Core.Service()); err != nil {
-			return nil, fmt.Errorf("failed to create or update APIService: %w", err)
-		}
-
-		caBundle, _ := sniProvider.CurrentCertKeyContent()
-		if err := CreateOrUpdateAPIService(wranglerContext.API.APIService(), caBundle); err != nil {
 			return nil, fmt.Errorf("failed to create or update APIService: %w", err)
 		}
 
@@ -175,7 +181,7 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 		}
 
 		authenticators = append(authenticators, defaultAuthenticator)
-	default:
+	} else {
 		logrus.Info("deleting imperative extension apiserver resources")
 
 		if err := CleanupExtensionAPIServer(wranglerContext); err != nil {
